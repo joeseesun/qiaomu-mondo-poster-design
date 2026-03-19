@@ -1,21 +1,50 @@
 #!/usr/bin/env python3
 """
 Mondo Style Design Generator - Enhanced Version
-Features: Claude-generated prompts, 3-column comparison, image-to-image, 20 artist styles
+Features: Claude-generated prompts, 3-column comparison, image-to-image, 37 artist styles
 """
 
 import os
 import sys
 import argparse
 import json
+import re
+import urllib.request
+import urllib.error
+import urllib.parse
+import mimetypes
+import time
 from datetime import datetime
-from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
-import io
 
 # API Configuration - PipeLLM Gemini
 PIPELLM_BASE_URL = 'https://api.pipellm.ai'
 DEFAULT_IMAGE_MODEL = 'gemini-3-pro-image-preview'   # 高质量图片模型
+
+# API Configuration - Tu-zi.com Gemini
+TUZI_BASE_URL = 'https://api.tu-zi.com'
+TUZI_IMAGE_MODEL = 'gemini-3.1-flash-image-preview-2k'
+
+# API Configuration - ModelScope Z-Image
+ZIMAGE_BASE_URL = 'https://api-inference.modelscope.cn/'
+ZIMAGE_DEFAULT_MODEL = 'Tongyi-MAI/Z-Image-Turbo'
+ZIMAGE_POLL_INTERVAL = 5  # seconds
+
+# API Configuration - Jimeng (local Docker)
+JIMENG_BASE_URL = 'http://localhost:8000'
+JIMENG_DEFAULT_MODEL = 'jimeng-image-4.5'
+
+# Aspect ratio → pixel size mapping (for providers that need explicit dimensions)
+ASPECT_RATIO_SIZES = {
+    "1:1":  (1024, 1024),
+    "16:9": (1280, 720),
+    "9:16": (720, 1280),
+    "21:9": (1680, 720),
+    "3:4":  (768, 1024),
+    "4:3":  (1024, 768),
+    "2:3":  (682, 1024),
+    "3:2":  (1024, 682),
+}
 
 # 30+ Design Styles: Poster Artists + Book Cover + Album Cover + Social Media
 ARTIST_STYLES = {
@@ -80,11 +109,13 @@ def get_genai_client():
 def get_format_description(aspect_ratio):
     """Get format description text matching the aspect ratio"""
     ratio_descriptions = {
-        "9:16": "vertical 9:16 portrait format",
+        "9:16": "vertical 9:16 portrait format, strong central vertical composition",
         "16:9": "horizontal 16:9 landscape format, wide cinematic composition",
         "21:9": "ultra-wide 21:9 panoramic banner format, horizontal landscape",
-        "3:4": "vertical 3:4 portrait format",
+        "3:4": "vertical 3:4 portrait format, classic poster proportions",
         "4:3": "horizontal 4:3 landscape format",
+        "2:3": "vertical 2:3 portrait format, tall elegant proportions",
+        "3:2": "horizontal 3:2 landscape format, classic photography proportions",
         "1:1": "square 1:1 format",
     }
     return ratio_descriptions.get(aspect_ratio, f"{aspect_ratio} format")
@@ -130,11 +161,304 @@ def generate_prompt(subject, design_type, style="auto", color_hint="", aspect_ra
 
     return prompt
 
-def generate_image(prompt, output_path=None, model=DEFAULT_IMAGE_MODEL, aspect_ratio="9:16", input_image=None):
-    """使用 PipeLLM Gemini 生成图片"""
+def get_default_output_path():
+    """Generate default output path in knowledge base"""
+    timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
+    default_dir = os.getenv('MONDO_OUTPUT_DIR', os.path.expanduser("~/乔木新知识库/60-69 素材/61 AI图片/mondo-designs"))
+    os.makedirs(default_dir, exist_ok=True)
+    return f"{default_dir}/mondo-{timestamp}.png"
+
+
+def resolve_size(aspect_ratio):
+    """Convert aspect ratio string to (width, height) tuple"""
+    if aspect_ratio in ASPECT_RATIO_SIZES:
+        return ASPECT_RATIO_SIZES[aspect_ratio]
+    # Try to parse custom ratio like "5:4"
+    parts = aspect_ratio.split(':')
+    if len(parts) == 2:
+        try:
+            w, h = int(parts[0]), int(parts[1])
+            # Scale to ~1024px on the longer side
+            scale = 1024 / max(w, h)
+            return (int(w * scale), int(h * scale))
+        except ValueError:
+            pass
+    return (1024, 1024)  # fallback
+
+
+def _urllib_request(url, data=None, headers=None, method='GET', timeout=30):
+    """Helper: make HTTP request using urllib, return (status_code, body_bytes)"""
+    headers = headers or {}
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.status, resp.read()
+    except urllib.error.HTTPError as e:
+        return e.code, e.read()
+
+
+def generate_image_zimage(prompt, output_path=None, aspect_ratio="9:16"):
+    """使用通义万相 Z-Image-Turbo（ModelScope API）生成图片"""
+    api_key = os.getenv('MODELSCOPE_API_KEY')
+    if not api_key:
+        print("⚠ MODELSCOPE_API_KEY not set, skipping z-image provider")
+        return None
+
+    width, height = resolve_size(aspect_ratio)
+    size_str = f"{width}x{height}"
+
+    print(f"🎨 Generating with Z-Image-Turbo (ModelScope)")
+    print(f"📐 Size: {size_str} (from {aspect_ratio})")
+    print(f"✍️  Prompt: {prompt[:80]}..." if len(prompt) > 80 else f"✍️  Prompt: {prompt}")
+    print("⏳ Please wait...\n")
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "X-ModelScope-Async-Mode": "true",
+    }
+    payload = json.dumps({
+        "model": ZIMAGE_DEFAULT_MODEL,
+        "prompt": prompt,
+        "size": size_str
+    }, ensure_ascii=False).encode('utf-8')
+
+    # Submit task with retry for 429
+    task_id = None
+    for attempt in range(3):
+        try:
+            status_code, body = _urllib_request(
+                f"{ZIMAGE_BASE_URL}v1/images/generations",
+                data=payload, headers=headers, method='POST', timeout=30
+            )
+            if status_code == 429:
+                wait = 2 ** attempt * 10
+                print(f"⚠️  Rate limit (429), waiting {wait}s...")
+                time.sleep(wait)
+                continue
+            if status_code >= 400:
+                print(f"⚠ HTTP {status_code}: {body[:200]}")
+                raise Exception(f"HTTP {status_code}")
+            resp_data = json.loads(body)
+            if "task_id" in resp_data:
+                task_id = resp_data["task_id"]
+                print(f"✅ Task submitted: {task_id}")
+                break
+        except Exception as e:
+            print(f"⚠ Attempt {attempt+1} failed: {e}")
+            if attempt < 2:
+                time.sleep(5)
+
+    if task_id is None:
+        print("❌ Z-Image task submission failed")
+        return None
+
+    # Poll for completion
+    poll_headers = {
+        "Authorization": f"Bearer {api_key}",
+        "X-ModelScope-Task-Type": "image_generation",
+    }
+    max_polls = 120  # 10 minutes max (120 * 5s)
+    for poll_count in range(max_polls):
+        try:
+            status_code, body = _urllib_request(
+                f"{ZIMAGE_BASE_URL}v1/tasks/{task_id}",
+                headers=poll_headers, timeout=30
+            )
+            if status_code >= 400:
+                print(f"❌ Poll HTTP {status_code}")
+                return None
+            try:
+                data = json.loads(body)
+            except (json.JSONDecodeError, TypeError):
+                print(f"❌ Invalid JSON response from Z-Image API")
+                return None
+            status = data.get("task_status")
+            if not status:
+                print(f"❌ No task_status in response: {str(data)[:200]}")
+                return None
+
+            if status == "SUCCEED":
+                images = data.get("output_images", [])
+                if not images:
+                    print("❌ No output images in response")
+                    return None
+                image_url = images[0]
+                print(f"🖼️  Downloading from: {image_url}")
+
+                if not output_path:
+                    output_path = get_default_output_path()
+                os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else '.', exist_ok=True)
+                try:
+                    urllib.request.urlretrieve(image_url, output_path)
+                except Exception as e:
+                    print(f"❌ Download failed: {e}")
+                    return None
+                print(f"✅ Saved to {output_path}")
+                return output_path
+
+            elif status == "FAILED":
+                print(f"❌ Z-Image generation failed: {data.get('error', 'Unknown')}")
+                return None
+            else:
+                print(f"   Status: {status}")
+                time.sleep(ZIMAGE_POLL_INTERVAL)
+        except Exception as e:
+            print(f"❌ Polling error: {e}")
+            return None
+
+    print(f"❌ Z-Image generation timed out after {max_polls * ZIMAGE_POLL_INTERVAL}s")
+    return None
+
+
+def generate_image_jimeng(prompt, output_path=None, aspect_ratio="9:16"):
+    """使用即梦 (Jimeng) 本地 Docker API 生成图片"""
+    session_id = os.getenv('JIMENG_SESSION_ID')
+    if not session_id:
+        print("⚠ JIMENG_SESSION_ID not set, skipping jimeng")
+        return None
+
+    width, height = resolve_size(aspect_ratio)
+
+    print(f"🎨 Generating with Jimeng (local Docker)")
+    print(f"📐 Size: {width}x{height} (from {aspect_ratio})")
+    print(f"✍️  Prompt: {prompt[:80]}..." if len(prompt) > 80 else f"✍️  Prompt: {prompt}")
+    print("⏳ Please wait...\n")
+
+    payload = json.dumps({
+        "model": JIMENG_DEFAULT_MODEL,
+        "prompt": prompt,
+        "n": 1,
+        "width": width,
+        "height": height
+    }).encode('utf-8')
+
+    try:
+        status_code, body = _urllib_request(
+            f"{JIMENG_BASE_URL}/v1/images/generations",
+            data=payload, method='POST', timeout=120,
+            headers={
+                "Authorization": f"Bearer {session_id}",
+                "Content-Type": "application/json"
+            }
+        )
+        if status_code >= 400:
+            print(f"❌ Jimeng HTTP {status_code}: {body[:200]}")
+            return None
+
+        data = json.loads(body)
+        images = data.get('data', [])
+        if not images:
+            print("❌ No images in Jimeng response")
+            return None
+
+        image_url = images[0].get('url')
+        if not image_url:
+            print("❌ No URL in Jimeng image data")
+            return None
+
+        # Download
+        print(f"🖼️  Downloading from Jimeng...")
+        if not output_path:
+            output_path = get_default_output_path()
+        os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else '.', exist_ok=True)
+        urllib.request.urlretrieve(image_url, output_path)
+        print(f"✅ Saved to {output_path}")
+        return output_path
+
+    except Exception as e:
+        print(f"❌ Jimeng error: {e}")
+        return None
+
+
+def generate_image_tuzi(prompt, output_path=None, aspect_ratio="9:16", input_image=None):
+    """使用 tu-zi.com Gemini Flash Image API 生成图片"""
+    urlreq = urllib.request
+    jsonlib = json
+
+    api_key = os.getenv('TUZI_API_KEY')
+    if not api_key:
+        print("⚠ TUZI_API_KEY not set, skipping tuzi provider")
+        return None
+
+    model = TUZI_IMAGE_MODEL
+    print(f"🎨 Generating with {model} (tu-zi.com)")
+    print(f"✍️  Prompt: {prompt[:80]}..." if len(prompt) > 80 else f"✍️  Prompt: {prompt}")
+    print("⏳ Please wait...\n")
+
+    parts = [{"text": prompt}]
+
+    # 图生图：添加输入图片
+    if input_image and os.path.exists(input_image):
+        try:
+            import base64
+            with open(input_image, 'rb') as f:
+                img_bytes = f.read()
+            # 检测 mime type
+            mime_type = "image/png" if input_image.lower().endswith('.png') else "image/jpeg"
+            img_b64 = base64.b64encode(img_bytes).decode()
+            parts.append({
+                "inline_data": {
+                    "mime_type": mime_type,
+                    "data": img_b64
+                }
+            })
+            print(f"📷 Using input image: {input_image}")
+        except Exception as e:
+            print(f"⚠ Could not load input image: {e}, ignoring")
+
+    payload = jsonlib.dumps({
+        "contents": [{"parts": parts}],
+        "generationConfig": {
+            "responseModalities": ["IMAGE", "TEXT"],
+            "imageConfig": {"aspectRatio": aspect_ratio}
+        }
+    }).encode('utf-8')
+
+    url = f"{TUZI_BASE_URL}/v1beta/models/{model}:generateContent"
+    req = urlreq.Request(url, data=payload, headers={
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json'
+    })
+
+    try:
+        with urlreq.urlopen(req, timeout=120) as resp:
+            data = jsonlib.loads(resp.read().decode())
+
+        # 解析响应：返回格式是 markdown 图片链接
+        parts_resp = data.get('candidates', [{}])[0].get('content', {}).get('parts', [])
+        image_url = None
+        for part in parts_resp:
+            text = part.get('text', '')
+            match = re.search(r'!\[.*?\]\((https?://[^\)]+)\)', text)
+            if match:
+                image_url = match.group(1)
+                break
+
+        if not image_url:
+            print("❌ No image URL in response")
+            print("Raw response:", jsonlib.dumps(data, ensure_ascii=False)[:500])
+            return None
+
+        # 下载图片
+        if not output_path:
+            output_path = get_default_output_path()
+
+        os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else '.', exist_ok=True)
+        urlreq.urlretrieve(image_url, output_path)
+        print(f"✅ Saved to {output_path}")
+        return output_path
+
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        return None
+
+
+def generate_image_pipellm(prompt, output_path=None, model=DEFAULT_IMAGE_MODEL, aspect_ratio="9:16", input_image=None):
+    """使用 PipeLLM Gemini API 生成图片"""
     client = get_genai_client()
 
-    print(f"🎨 Generating with {model}")
+    print(f"🎨 Generating with {model} (PipeLLM)")
     print(f"✍️  Prompt: {prompt[:80]}..." if len(prompt) > 80 else f"✍️  Prompt: {prompt}")
     print("⏳ Please wait...\n")
 
@@ -146,7 +470,6 @@ def generate_image(prompt, output_path=None, model=DEFAULT_IMAGE_MODEL, aspect_r
             from google.genai import types
             with open(input_image, 'rb') as f:
                 img_bytes = f.read()
-            pil_img = Image.open(io.BytesIO(img_bytes))
             contents = [
                 types.Part.from_bytes(data=img_bytes, mime_type="image/png"),
                 f"Transform this image in Mondo poster style: {prompt}"
@@ -173,11 +496,7 @@ def generate_image(prompt, output_path=None, model=DEFAULT_IMAGE_MODEL, aspect_r
             return None
 
         if not output_path:
-            timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
-            default_dir = os.path.expanduser("~/乔木新知识库/60-69 素材/61 AI图片/mondo-designs")
-            os.makedirs(default_dir, exist_ok=True)
-            output_path = f"{default_dir}/mondo-{timestamp}.png"
-
+            output_path = get_default_output_path()
         os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else '.', exist_ok=True)
         img = image_part.as_image()
         img.save(output_path)
@@ -187,6 +506,124 @@ def generate_image(prompt, output_path=None, model=DEFAULT_IMAGE_MODEL, aspect_r
     except Exception as e:
         print(f"❌ Error: {e}")
         return None
+
+
+def generate_image(prompt, output_path=None, model=DEFAULT_IMAGE_MODEL, aspect_ratio="9:16", input_image=None, provider="tuzi"):
+    """
+    生成图片，支持 4 个 provider:
+    - tuzi (默认): Gemini 2.5 Flash Image via tu-zi.com
+    - pipellm: Gemini 3 Pro Image via PipeLLM
+    - z-image: 通义万相 Z-Image-Turbo via ModelScope
+    - jimeng: 即梦 via 本地 Docker API
+
+    tuzi/pipellm 支持图生图 (input_image)，z-image/jimeng 仅支持文生图。
+    失败时自动降级：tuzi→pipellm, z-image→jimeng（不跨系列降级）
+    """
+    if provider == "tuzi":
+        result = generate_image_tuzi(prompt, output_path, aspect_ratio, input_image)
+        if result is not None:
+            return result
+        print("\n⚠️  Tu-zi.com failed, auto-fallback to PipeLLM...")
+        print("=" * 50)
+        return generate_image_pipellm(prompt, output_path, model, aspect_ratio, input_image)
+
+    elif provider == "pipellm":
+        return generate_image_pipellm(prompt, output_path, model, aspect_ratio, input_image)
+
+    elif provider == "z-image":
+        result = generate_image_zimage(prompt, output_path, aspect_ratio)
+        if result is not None:
+            return result
+        print("\n⚠️  Z-Image failed, auto-fallback to Jimeng...")
+        print("=" * 50)
+        return generate_image_jimeng(prompt, output_path, aspect_ratio)
+
+    elif provider == "jimeng":
+        return generate_image_jimeng(prompt, output_path, aspect_ratio)
+
+    else:
+        print(f"❌ Unknown provider: {provider}")
+        return None
+
+def feishu_send_image(image_path, target):
+    """Upload image to Feishu and send as image message. Returns True on success."""
+    app_id = os.getenv('FEISHU_APP_ID')
+    app_secret = os.getenv('FEISHU_APP_SECRET')
+    if not app_id or not app_secret:
+        print("⚠ FEISHU_APP_ID/SECRET not set, skipping Feishu send")
+        return False
+
+    base = 'https://open.feishu.cn/open-apis'
+
+    # 1. Get tenant access token
+    try:
+        tok_data = json.dumps({'app_id': app_id, 'app_secret': app_secret}).encode()
+        tok_req = urllib.request.Request(
+            f'{base}/auth/v3/tenant_access_token/internal',
+            data=tok_data, headers={'Content-Type': 'application/json'})
+        with urllib.request.urlopen(tok_req, timeout=15) as resp:
+            tok_r = json.loads(resp.read())
+        token = tok_r.get('tenant_access_token')
+        if not token:
+            print(f"⚠ Feishu token error: {tok_r}")
+            return False
+    except Exception as e:
+        print(f"⚠ Feishu auth failed: {e}")
+        return False
+
+    # 2. Upload image
+    try:
+        with open(image_path, 'rb') as f:
+            img_data = f.read()
+        boundary = f'----FsBoundary{int(time.time() * 1000)}'
+        filename = os.path.basename(image_path)
+        mime = mimetypes.guess_type(filename)[0] or 'image/png'
+        body = (
+            f'--{boundary}\r\n'
+            f'Content-Disposition: form-data; name="image_type"\r\n\r\nmessage\r\n'
+            f'--{boundary}\r\n'
+            f'Content-Disposition: form-data; name="image"; filename="{filename}"\r\n'
+            f'Content-Type: {mime}\r\n\r\n'
+        ).encode() + img_data + f'\r\n--{boundary}--\r\n'.encode()
+        up_req = urllib.request.Request(
+            f'{base}/im/v1/images', data=body, method='POST',
+            headers={'Content-Type': f'multipart/form-data; boundary={boundary}',
+                     'Authorization': f'Bearer {token}'})
+        with urllib.request.urlopen(up_req, timeout=60) as resp:
+            up_r = json.loads(resp.read())
+        if up_r.get('code', 0) != 0:
+            print(f"⚠ Feishu image upload error: {up_r.get('msg')}")
+            return False
+        image_key = up_r.get('data', {}).get('image_key')
+        if not image_key:
+            print(f"⚠ No image_key in Feishu response: {up_r}")
+            return False
+    except Exception as e:
+        print(f"⚠ Feishu image upload failed: {e}")
+        return False
+
+    # 3. Send image message
+    try:
+        id_type = 'chat_id' if target.startswith('oc_') else 'open_id'
+        send_data = json.dumps({
+            'receive_id': target, 'msg_type': 'image',
+            'content': json.dumps({'image_key': image_key})
+        }).encode()
+        send_url = f'{base}/im/v1/messages?receive_id_type={id_type}'
+        send_req = urllib.request.Request(
+            send_url, data=send_data, method='POST',
+            headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {token}'})
+        with urllib.request.urlopen(send_req, timeout=15) as resp:
+            send_r = json.loads(resp.read())
+        if send_r.get('code', 0) != 0:
+            print(f"⚠ Feishu send error: {send_r.get('msg')}")
+            return False
+        print(f"📨 Image sent to Feishu ({target})")
+        return True
+    except Exception as e:
+        print(f"⚠ Feishu send failed: {e}")
+        return False
+
 
 def generate_comparison(subject, design_type, styles, aspect_ratio="9:16", colors=""):
     """
@@ -214,7 +651,9 @@ def generate_comparison(subject, design_type, styles, aspect_ratio="9:16", color
         prompt = generate_prompt(subject, design_type, style, color_hint=colors, aspect_ratio=aspect_ratio)
 
         timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
-        temp_path = f"outputs/temp-{style}-{timestamp}.png"
+        default_dir = os.getenv('MONDO_OUTPUT_DIR', os.path.expanduser("~/乔木新知识库/60-69 素材/61 AI图片/mondo-designs"))
+        os.makedirs(default_dir, exist_ok=True)
+        temp_path = f"{default_dir}/temp-{style}-{timestamp}.png"
 
         result = generate_image(prompt, temp_path, aspect_ratio=aspect_ratio)
         if result:
@@ -276,18 +715,20 @@ def generate_comparison(subject, design_type, styles, aspect_ratio="9:16", color
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Enhanced Mondo Style Design Generator with AI optimization, comparison mode, and 20 artist styles',
+        description='Enhanced Mondo Style Design Generator with comparison mode and 37 artist styles',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-🎨 20 Artist Styles Available:
-  Classic: saul-bass, toulouse-lautrec, alphonse-mucha, jules-cheret, cassandre
-  Modern: olly-moss, tyler-stout, martin-ansin, drew-struzan, milton-glaser
-  Contemporary: kilian-eng, dan-mccarthy, jock, shepard-fairey, jay-ryan
+🎨 37 Artist Styles Available:
+  Poster:  saul-bass, olly-moss, tyler-stout, martin-ansin, toulouse-lautrec, alphonse-mucha,
+           jules-cheret, cassandre, milton-glaser, drew-struzan, kilian-eng, laurent-durieux,
+           jay-ryan, dan-mccarthy, jock, shepard-fairey, steinlen, josef-muller-brockmann,
+           paul-rand, paula-scher
+  Book:    chip-kidd, peter-mendelsund, coralie-bickford-smith, david-pearson, wang-zhi-hong, jan-tschichold
+  Album:   reid-miles, david-stone-martin, peter-saville
+  Chinese: wenyi, guochao, rixi, hanxi
+  Generic: minimal, atmospheric, negative-space
 
 Examples:
-  # AI-enhanced prompt (respects your original idea)
-  python3 generate_mondo_enhanced.py "Blade Runner" movie --ai-enhance
-
   # 3-style comparison
   python3 generate_mondo_enhanced.py "Dune" movie --compare saul-bass,olly-moss,kilian-eng
 
@@ -316,17 +757,21 @@ Examples:
     parser.add_argument('--aspect-ratio', '--ratio', dest='aspect_ratio', default='9:16',
                        help='Aspect ratio (default: 9:16)')
     parser.add_argument('--output', help='Output file path')
-    parser.add_argument('--model', default=DEFAULT_IMAGE_MODEL, help='Model to use')
+    parser.add_argument('--model', default=DEFAULT_IMAGE_MODEL, help='Model to use (pipellm only)')
+    parser.add_argument('--provider', choices=['tuzi', 'pipellm', 'z-image', 'jimeng'], default='tuzi',
+                       help='Image generation provider: tuzi (default, Gemini Flash), pipellm (Gemini Pro), z-image (通义万相), jimeng (即梦)')
     parser.add_argument('--no-generate', action='store_true',
                        help='Only show prompt without generating')
     parser.add_argument('--list-styles', action='store_true',
                        help='List all available artist styles')
+    parser.add_argument('--feishu-to', type=str,
+                       help='Send generated image to Feishu user (ou_xxx) or group (oc_xxx)')
 
     args = parser.parse_args()
 
     # List styles
     if args.list_styles:
-        print("\n🎨 20 Greatest Poster Artists - Available Styles:\n")
+        print("\n🎨 37 Artist Styles Available:\n")
         for style, desc in ARTIST_STYLES.items():
             print(f"  {style:25} → {desc}")
         print()
@@ -352,9 +797,13 @@ Examples:
     print(f"{'='*80}\n")
 
     if not args.no_generate:
-        output_path = generate_image(prompt, args.output, args.model, args.aspect_ratio, args.input)
+        output_path = generate_image(prompt, args.output, args.model, args.aspect_ratio, args.input, args.provider)
         if not output_path:
             sys.exit(1)
+        # Auto-send to Feishu if --feishu-to is set
+        feishu_to = getattr(args, 'feishu_to', None)
+        if feishu_to and output_path:
+            feishu_send_image(output_path, feishu_to)
     else:
         print("✓ Prompt generated. Use without --no-generate to create image.")
 

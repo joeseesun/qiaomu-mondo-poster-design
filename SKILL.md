@@ -1,6 +1,6 @@
 ---
 name: qiaomu-mondo-poster-design
-description: 一句话生成大师级海报、书籍封面、专辑封面和各类设计作品。无需懂PS、配色或艺术史，AI自动选择最佳风格（基于33+位传奇设计师）。支持多平台多比例：公众号封面(21:9)、小红书配图(3:4)、文章配图(16:9)、书籍封面(9:16)、专辑封面(1:1)、电影海报(9:16)。包含AI提示词优化、风格对比、图生图转换功能。触发词："Mondo风格"、"书籍封面设计"、"专辑封面"、"海报设计"、"读书笔记配图"、"公众号封面"、"小红书配图"、"文章配图"。One-sentence generation of master-level posters, book covers, album covers and designs. 33+ legendary designer styles with multi-platform aspect ratio support (21:9, 16:9, 3:4, 1:1, 9:16).
+description: 一句话生成大师级海报、书籍封面、专辑封面和各类设计作品。无需懂PS、配色或艺术史，AI自动选择最佳风格（基于37位传奇设计师）。支持多平台多比例：公众号封面(21:9)、小红书配图(3:4)、文章配图(16:9)、书籍封面(9:16)、专辑封面(1:1)、电影海报(9:16)。包含风格对比、图生图转换功能。触发词："Mondo风格"、"书籍封面设计"、"专辑封面"、"海报设计"、"读书笔记配图"、"公众号封面"、"小红书配图"、"文章配图"。One-sentence generation of master-level posters, book covers, album covers and designs. 37 legendary designer styles with multi-platform aspect ratio support (21:9, 16:9, 3:4, 1:1, 9:16).
 ---
 
 # Mondo Style Design Generator
@@ -216,32 +216,9 @@ For detailed format and genre-specific templates:
 - [references/book-covers.md](references/book-covers.md) - Book cover design patterns and best practices
 - [references/artist-styles.md](references/artist-styles.md) - Tyler Stout, Olly Moss, Martin Ansin, etc.
 
-## 🚀 Enhanced Features (NEW!)
+## 🚀 Enhanced Features
 
-### 1. AI-Powered Prompt Optimization
-
-Let AI enhance your prompt while **respecting your original intent**:
-
-```bash
-python3 scripts/generate_mondo_enhanced.py "Blade Runner" movie --ai-enhance
-```
-
-**How it works:**
-- Takes your original idea
-- Adds ONE perfect symbolic element
-- Suggests complementary colors (you can override)
-- Uses negative space techniques
-- Keeps it clean and minimal
-
-**Example:**
-```bash
-# Your input: "Inception movie"
-# AI enhances to: "Spinning top floating in Mondo poster style, vertical 9:16,
-# single iconic object, negative space reveals dream layers, 2-color duotone:
-# gold and deep blue, Olly Moss minimal approach"
-```
-
-### 2. Three-Column Style Comparison
+### 1. Three-Column Style Comparison
 
 Generate 3 different styles side-by-side to choose the best:
 
@@ -254,7 +231,7 @@ python3 scripts/generate_mondo_enhanced.py "Dune" movie --compare saul-bass,olly
 - Client presentations
 - Finding the best style for your subject
 
-### 3. Image-to-Image Transformation
+### 2. Image-to-Image Transformation
 
 Transform existing posters into Mondo style:
 
@@ -267,16 +244,15 @@ python3 scripts/generate_mondo_enhanced.py "noir thriller" movie --input origina
 - Apply Mondo aesthetic to existing designs
 - Reimagine classic posters
 
-### 4. 20 Greatest Poster Artists
+### 3. 37 Artist Styles
 
-Now includes 20 legendary artist styles:
+Now includes 37 artist styles across 7 categories:
 
 **Belle Époque Pioneers:**
 - `jules-cheret` - Bright joyful colors, dynamic feminine figures
 - `toulouse-lautrec` - Flat blocks, Japanese influence, bold silhouettes
 - `alphonse-mucha` - Art Nouveau flowing curves, ornate floral
 - `steinlen` - Social realist, expressive lines, cat motifs
-- `eugène-grasset` - Medieval Gothic, stained glass aesthetic
 
 **Modernist Masters:**
 - `saul-bass` - Minimalist geometric abstraction, visual metaphors
@@ -300,12 +276,36 @@ Now includes 20 legendary artist styles:
 - `jay-ryan` - Folksy handmade, warm textured simple
 - `paula-scher` - Typographic maximalism, layered text
 
+**Book Cover Designers:**
+- `chip-kidd` - Conceptual, single symbolic object, bold typography
+- `peter-mendelsund` - Abstract literary, deconstructed typography
+- `coralie-bickford-smith` - Penguin Clothbound Classics, decorative patterns
+- `david-pearson` - Bold typographic-only, text as visual element
+- `wang-zhi-hong` - East Asian design, restrained elegant typography
+- `jan-tschichold` - Modernist Penguin, Swiss precision grid
+
+**Album Cover Designers:**
+- `reid-miles` - Blue Note Records, bold asymmetric typography
+- `david-stone-martin` - Verve Records, gestural ink brushstroke
+- `peter-saville` - Factory Records, extreme minimalism
+
+**Chinese Aesthetic Styles:**
+- `wenyi` - 文艺风, soft muted tones, poetic atmosphere
+- `guochao` - 国潮风, traditional motifs reimagined modern
+- `rixi` - 日系, warm film grain, pastel minimal
+- `hanxi` - 韩系, clean bright pastel, dreamy ethereal
+
+**Generic Styles:**
+- `minimal` - Centered single focal point, 2-3 colors
+- `atmospheric` - Strong focal element with atmospheric background
+- `negative-space` - Figure-ground inversion, hidden elements
+
 **View all styles:**
 ```bash
 python3 scripts/generate_mondo_enhanced.py --list-styles
 ```
 
-### 5. Smart Color Suggestions
+### 4. Smart Color Suggestions
 
 AI suggests complementary colors, but you can override:
 
@@ -337,7 +337,7 @@ This skill can generate actual images directly using the bundled scripts:
 
 ### Enhanced Version (Recommended)
 
-**Full feature set:** AI enhancement, comparisons, image-to-image, 20 artists
+**Full feature set:** comparisons, image-to-image, 37 artist styles
 
 ```bash
 python3 scripts/generate_mondo_enhanced.py "subject" "type" [options]
@@ -346,21 +346,27 @@ python3 scripts/generate_mondo_enhanced.py "subject" "type" [options]
 **Enhanced Parameters:**
 - `subject`: What to design
 - `type`: Design type - "movie", "book", "album", "event"
-- `--style`: Artist style (20 options, see --list-styles)
-- `--ai-enhance`: Let AI optimize prompt (respects your intent)
+- `--style`: Artist style (37 options, see --list-styles)
+- `--provider`: Image generation provider (see below)
 - `--compare`: Generate 3-style comparison (e.g., "saul-bass,olly-moss,jock")
-- `--input`: Input image for image-to-image transformation
+- `--input`: Input image for image-to-image transformation (tuzi/pipellm only)
 - `--colors`: Color preferences (e.g., "orange, teal, black")
 - `--aspect-ratio`: Aspect ratio (default: 9:16)
 - `--output`: Custom output path
 - `--no-generate`: Only show prompt
 
-**Enhanced Examples:**
+**Image Providers (`--provider`):**
 
-AI-optimized generation:
-```bash
-python3 scripts/generate_mondo_enhanced.py "Blade Runner" movie --ai-enhance
-```
+| Provider | Model | Features | Env Var |
+|----------|-------|----------|---------|
+| `tuzi` (default) | Gemini 3.1 Flash Image 2K | Fast, supports image-to-image | `TUZI_API_KEY` |
+| `pipellm` | Gemini 3 Pro Image | High quality, supports image-to-image | `PIPELLM_API_KEY` |
+| `z-image` | 通义万相 Z-Image-Turbo | Chinese art styles, LoRA support | `MODELSCOPE_API_KEY` |
+| `jimeng` | 即梦 jimeng-image-4.5 | Chinese style, free quota (66/day) | `JIMENG_SESSION_ID` |
+
+**Fallback chain:** tuzi→pipellm, z-image→jimeng (stays within same provider family)
+
+**Enhanced Examples:**
 
 3-style comparison:
 ```bash
@@ -377,63 +383,19 @@ With color preferences:
 python3 scripts/generate_mondo_enhanced.py "Jazz Night" event --style milton-glaser --colors "psychedelic orange, purple, yellow"
 ```
 
-List all 20 artist styles:
+Use Z-Image (通义万相) provider:
+```bash
+python3 scripts/generate_mondo_enhanced.py "Akira" movie --style kilian-eng --provider z-image
+```
+
+Use Jimeng (即梦) provider:
+```bash
+python3 scripts/generate_mondo_enhanced.py "Chinese ink landscape" book --style wang-zhi-hong --provider jimeng
+```
+
+List all 37 artist styles:
 ```bash
 python3 scripts/generate_mondo_enhanced.py --list-styles
-```
-
-### Standard Version (Simple & Fast)
-
-**Basic usage for quick generation:**
-
-```bash
-python3 scripts/generate_mondo.py "subject" "type" [options]
-```
-
-**Parameters:**
-- `subject`: What to design (e.g., "Neuromancer cyberpunk novel", "Jazz concert poster")
-- `type`: Design type - "movie", "book", "album", "event"
-- `--aspect-ratio` / `--ratio`: Aspect ratio (default: **9:16** for mobile/social media)
-  - Common ratios: 9:16 (vertical mobile), 16:9 (horizontal), 1:1 (square), 2:3, 3:2, 4:5
-- `--style`: Artist style - "olly-moss", "tyler-stout", "minimal", "atmospheric" (default: auto)
-- `--output`: Custom output path (default: outputs/)
-- `--no-generate`: Only create prompt without generating image
-
-**Why 9:16 Default?**
-- Optimized for modern mobile devices and social media (Instagram Stories, TikTok, Reels)
-- Better vertical composition for posters and book covers
-- Maximizes screen space on smartphones
-
-**Examples:**
-
-Movie poster (default 9:16 vertical):
-```bash
-python3 scripts/generate_mondo.py "Akira cyberpunk anime" "movie"
-```
-
-Book cover with minimal style (9:16):
-```bash
-python3 scripts/generate_mondo.py "1984 dystopian novel" "book" --style minimal
-```
-
-Album cover with square ratio:
-```bash
-python3 scripts/generate_mondo.py "Pink Floyd The Wall progressive rock" "album" --aspect-ratio 1:1
-```
-
-Horizontal cinema poster:
-```bash
-python3 scripts/generate_mondo.py "Western film Sergio Leone" "movie" --aspect-ratio 16:9
-```
-
-Custom ratio for print:
-```bash
-python3 scripts/generate_mondo.py "Jazz Festival poster" "event" --ratio 2:3 --style atmospheric
-```
-
-Generate prompt only (no image):
-```bash
-python3 scripts/generate_mondo.py "Dune sci-fi epic" "movie" --no-generate
 ```
 
 ### Manual Generation
@@ -450,3 +412,41 @@ If you prefer to generate prompts manually and use other image generation tools:
 - Model: `google/gemini-3.1-flash-image-preview` (best quality/speed balance)
 - Resolution: 2K or higher for print quality
 - Format: PNG with transparency support
+
+## 🚀 Feishu / 飞书图片自动投递
+
+**⚠️ 强制规则：在飞书/OpenClaw 对话中生成图片时，必须使用 `--feishu-to` 参数，让脚本自动上传并发送图片到飞书聊天！**
+
+### 使用方式（一条命令搞定）
+
+生成脚本已内置飞书图片上传和发送功能，只需在生成命令中加 `--feishu-to` 参数：
+
+```bash
+# Enhanced 版本（推荐）
+python3 scripts/generate_mondo_enhanced.py "Blade Runner" movie --style saul-bass --feishu-to <chat_id_or_open_id>
+
+# Basic 版本
+python3 scripts/generate_mondo.py "Akira" movie --feishu-to <chat_id_or_open_id>
+```
+
+**参数说明**：
+- `--feishu-to`：目标用户 `open_id`（`ou_xxx`）或群聊 `chat_id`（`oc_xxx`），从当前对话上下文获取
+
+### 使用示例
+
+```bash
+# 发送到用户私聊
+python3 scripts/generate_mondo_enhanced.py "Jazz Night" event --style milton-glaser \
+  --feishu-to ou_b3101397cd3c2bdea667b26f6f169afe
+
+# 发送到群聊
+python3 scripts/generate_mondo_enhanced.py "Dune" movie --style kilian-eng \
+  --feishu-to oc_0bdbbb25dd1951b9373708f43b159cef
+```
+
+### 注意事项
+
+- 需要环境变量 `FEISHU_APP_ID` 和 `FEISHU_APP_SECRET`（launchd plist 中已配置）
+- 如果环境变量未设置，会跳过飞书发送，只保存到本地
+- 支持格式：JPEG, PNG, WEBP, GIF, BMP, TIFF
+- 飞书图片大小限制：10MB

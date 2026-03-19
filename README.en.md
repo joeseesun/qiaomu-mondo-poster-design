@@ -6,13 +6,13 @@ English | [简体中文](README.md)
 
 **Powered by Google Gemini 3 Pro Image** 🎨
 
-## 🚀 New in v3.0!
+## 🚀 Features
 
-✨ **20 Legendary Artists** - From Saul Bass to Toulouse-Lautrec
+✨ **37 Artist Styles** - From Saul Bass to Toulouse-Lautrec, Chip Kidd to Reid Miles
 🤖 **AI Auto-Style Selection** - Perfect match for any subject
 📱 **Beginner-Friendly** - No design knowledge needed
-🎨 **Versatile Formats** - Posters, book covers, social media graphics
-🖼️ **Smart Features** - AI optimization, comparison, image-to-image
+🎨 **Versatile Formats** - Posters, book covers, album covers, social media graphics
+🖼️ **Smart Features** - Comparison mode, image-to-image transformation
 
 ## Installation
 
@@ -64,8 +64,8 @@ Simply say:
 ### Command Line
 
 ```bash
-# AI-enhanced generation
-python3 ~/.claude/skills/qiaomu-mondo-poster-design/scripts/generate_mondo_enhanced.py "Blade Runner" movie --ai-enhance
+# Single generation with style
+python3 ~/.claude/skills/qiaomu-mondo-poster-design/scripts/generate_mondo_enhanced.py "Blade Runner" movie --style saul-bass
 
 # 3-style comparison
 python3 ~/.claude/skills/qiaomu-mondo-poster-design/scripts/generate_mondo_enhanced.py "Akira" movie --compare kilian-eng,saul-bass,jock
@@ -80,10 +80,10 @@ python3 ~/.claude/skills/qiaomu-mondo-poster-design/scripts/generate_mondo_enhan
 python3 ~/.claude/skills/qiaomu-mondo-poster-design/scripts/generate_mondo_enhanced.py --list-styles
 ```
 
-## 🎨 20 Legendary Artists
+## 🎨 37 Artist Styles
 
 **Belle Époque (1870s-1900s)**
-- jules-cheret, toulouse-lautrec, alphonse-mucha, steinlen, eugène-grasset
+- jules-cheret, toulouse-lautrec, alphonse-mucha, steinlen
 
 **Modernist (1920s-1960s)**
 - saul-bass, cassandre, milton-glaser, josef-muller-brockmann, paul-rand
@@ -94,15 +94,21 @@ python3 ~/.claude/skills/qiaomu-mondo-poster-design/scripts/generate_mondo_enhan
 **Contemporary**
 - kilian-eng, dan-mccarthy, jock, shepard-fairey, jay-ryan, paula-scher
 
+**Book Cover Designers**
+- chip-kidd, peter-mendelsund, coralie-bickford-smith, david-pearson, wang-zhi-hong, jan-tschichold
+
+**Album Cover Designers**
+- reid-miles, david-stone-martin, peter-saville
+
+**Chinese Aesthetic Styles**
+- wenyi (文艺风), guochao (国潮风), rixi (日系), hanxi (韩系)
+
+**Generic Styles**
+- minimal, atmospheric, negative-space
+
 [See full artist guide →](references/artist-styles.md)
 
 ## ✨ Features
-
-### AI Prompt Optimization
-Enhances your idea while respecting the original intent
-```bash
---ai-enhance
-```
 
 ### 3-Column Comparison
 Compare styles side-by-side
@@ -133,9 +139,8 @@ AI suggests or use your own
 ## 💻 Requirements
 
 - Python 3.7+
-- `requests` (required)
-- `Pillow` (optional, for comparison/image-to-image)
-- AI Gateway API Key as `AI_GATEWAY_API_KEY` env variable
+- `Pillow` (for comparison mode)
+- API Key for one of: `TUZI_API_KEY`, `PIPELLM_API_KEY`, `MODELSCOPE_API_KEY`, or `JIMENG_SESSION_ID`
 
 ```bash
 pip install -r requirements.txt
@@ -144,7 +149,7 @@ pip install -r requirements.txt
 ## 📚 Documentation
 
 - [SKILL.md](SKILL.md) - Full guide
-- [Artist Styles](references/artist-styles.md) - 20 artists explained
+- [Artist Styles](references/artist-styles.md) - 37 artists explained
 - [Genre Templates](references/genre-templates.md) - Horror, sci-fi, etc.
 - [Composition Patterns](references/composition-patterns.md) - Layout strategies
 
