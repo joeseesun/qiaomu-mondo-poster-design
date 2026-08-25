@@ -78,6 +78,10 @@ python3 ~/.claude/skills/qiaomu-mondo-poster-design/scripts/generate_mondo_enhan
 
 # List all styles
 python3 ~/.claude/skills/qiaomu-mondo-poster-design/scripts/generate_mondo_enhanced.py --list-styles
+
+# Optional Atlas Cloud backend for the standard generator
+export ATLASCLOUD_API_KEY="your-api-key"
+python3 ~/.claude/skills/qiaomu-mondo-poster-design/scripts/generate_mondo.py "Dune" movie --provider atlas
 ```
 
 ## 🎨 20 Legendary Artists
@@ -136,6 +140,7 @@ AI suggests or use your own
 - `requests` (required)
 - `Pillow` (optional, for comparison/image-to-image)
 - AI Gateway API Key as `AI_GATEWAY_API_KEY` env variable
+- Atlas Cloud API Key as `ATLASCLOUD_API_KEY` when using `--provider atlas`
 
 ```bash
 pip install -r requirements.txt
