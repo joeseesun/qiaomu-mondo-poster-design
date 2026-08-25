@@ -40,6 +40,13 @@ npx skills add joeseesun/qiaomu-mondo-poster-design
 "为我的小红书读书笔记《小王子》设计 3:4 配图"
 ```
 
+标准脚本也可选用 Atlas Cloud 生成图片，原 AI Gateway 仍是默认后端：
+
+```bash
+export ATLASCLOUD_API_KEY="your-api-key"
+python3 scripts/generate_mondo.py "为《三体》设计书籍封面" book --provider atlas
+```
+
 **就这么简单！** 你不需要：
 - ❌ 学习Photoshop
 - ❌ 懂什么是"负空间"、"极简主义"
@@ -443,7 +450,7 @@ python3 ~/.claude/skills/qiaomu-mondo-poster-design/scripts/generate_mondo_enhan
 **A:** 可以！这叫"图生图"功能，你可以把现有的照片或海报转换成Mondo艺术风格。
 
 ### Q: 需要安装什么软件吗？
-**A:** 需要安装Python 3.7+，以及设置AI Gateway API Key。详细安装步骤看SKILL.md。
+**A:** 需要安装Python 3.7+，并设置默认 AI Gateway 的 API Key；使用可选 Atlas Cloud 后端时设置 `ATLASCLOUD_API_KEY`。详细安装步骤看SKILL.md。
 
 ---
 

@@ -397,6 +397,8 @@ python3 scripts/generate_mondo.py "subject" "type" [options]
   - Common ratios: 9:16 (vertical mobile), 16:9 (horizontal), 1:1 (square), 2:3, 3:2, 4:5
 - `--style`: Artist style - "olly-moss", "tyler-stout", "minimal", "atmospheric" (default: auto)
 - `--output`: Custom output path (default: outputs/)
+- `--provider`: Image backend - `gateway` (default) or `atlas`
+- `--model`: Optional model override; each provider has its own default
 - `--no-generate`: Only create prompt without generating image
 
 **Why 9:16 Default?**
@@ -435,6 +437,17 @@ Generate prompt only (no image):
 ```bash
 python3 scripts/generate_mondo.py "Dune sci-fi epic" "movie" --no-generate
 ```
+
+Generate with the optional Atlas Cloud backend:
+```bash
+export ATLASCLOUD_API_KEY="your-api-key"
+python3 scripts/generate_mondo.py "Dune sci-fi epic" movie --provider atlas
+```
+
+The Atlas backend defaults to `google/nano-banana-2-lite/text-to-image`, validates
+the requested aspect ratio before submitting, and saves the generated 1K image to
+the same output path. Its generation POST is submitted once; only prediction GET
+requests are polled with a fixed upper bound.
 
 ### Manual Generation
 
